@@ -272,11 +272,14 @@ class Config:
                 llm_dict["evaluator_models"] = [
                     LLMModelConfig(**m) for m in llm_dict["evaluator_models"]
                 ]
-            api_key = llm_dict.get("api_key", "").strip()
-            if api_key.startswith("${") and api_key.endswith("}"):
-                api_key_env = os.environ.get(api_key[2:-1])
-                if api_key_env is not None:
-                    llm_dict["api_key"] = api_key_env
+            # Safely handle api_key which may be null in YAML
+            api_key_value = llm_dict.get("api_key")
+            if isinstance(api_key_value, str):
+                api_key = api_key_value.strip()
+                if api_key.startswith("${") and api_key.endswith("}"):
+                    api_key_env = os.environ.get(api_key[2:-1])
+                    if api_key_env is not None:
+                        llm_dict["api_key"] = api_key_env
             config.llm = LLMConfig(**llm_dict)
         if "prompt" in config_dict:
             config.prompt = PromptConfig(**config_dict["prompt"])
