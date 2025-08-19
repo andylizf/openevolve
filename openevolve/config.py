@@ -266,20 +266,41 @@ class Config:
         # Update nested configs
         if "llm" in config_dict:
             llm_dict = config_dict["llm"]
+            
+            # Helper function to process environment variables in model configs
+            def process_env_vars_in_model(model_dict):
+                """Process environment variables in model configuration."""
+                if "api_key" in model_dict:
+                    api_key = str(model_dict["api_key"]).strip()
+                    if api_key.startswith("${") and api_key.endswith("}"):
+                        env_var_name = api_key[2:-1]
+                        api_key_env = os.environ.get(env_var_name)
+                        if api_key_env is not None:
+                            model_dict["api_key"] = api_key_env
+                return model_dict
+            
             if "models" in llm_dict:
-                llm_dict["models"] = [LLMModelConfig(**m) for m in llm_dict["models"]]
+                # Process environment variables for each model before creating LLMModelConfig
+                processed_models = []
+                for m in llm_dict["models"]:
+                    processed_model = process_env_vars_in_model(dict(m))
+                    processed_models.append(LLMModelConfig(**processed_model))
+                llm_dict["models"] = processed_models
+                
             if "evaluator_models" in llm_dict:
-                llm_dict["evaluator_models"] = [
-                    LLMModelConfig(**m) for m in llm_dict["evaluator_models"]
-                ]
-            # Safely handle api_key which may be null in YAML
-            api_key_value = llm_dict.get("api_key")
-            if isinstance(api_key_value, str):
-                api_key = api_key_value.strip()
-                if api_key.startswith("${") and api_key.endswith("}"):
-                    api_key_env = os.environ.get(api_key[2:-1])
-                    if api_key_env is not None:
-                        llm_dict["api_key"] = api_key_env
+                # Process environment variables for each evaluator model
+                processed_eval_models = []
+                for m in llm_dict["evaluator_models"]:
+                    processed_model = process_env_vars_in_model(dict(m))
+                    processed_eval_models.append(LLMModelConfig(**processed_model))
+                llm_dict["evaluator_models"] = processed_eval_models
+                
+            # Also handle top-level api_key for backward compatibility
+            api_key = llm_dict.get("api_key", "").strip()
+            if api_key.startswith("${") and api_key.endswith("}"):
+                api_key_env = os.environ.get(api_key[2:-1])
+                if api_key_env is not None:
+                    llm_dict["api_key"] = api_key_env
             config.llm = LLMConfig(**llm_dict)
         if "prompt" in config_dict:
             config.prompt = PromptConfig(**config_dict["prompt"])

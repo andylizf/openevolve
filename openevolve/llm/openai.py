@@ -65,14 +65,30 @@ class OpenAILLM(LLMInterface):
         formatted_messages.extend(messages)
 
         # Set up generation parameters
-        if self.api_base == "https://api.openai.com/v1" and str(self.model).lower().startswith("o"):
-            # For o-series models
+        # Check if model requires max_completion_tokens (o-series and gpt-5 models)
+        model_lower = str(self.model).lower()
+        uses_completion_tokens = (
+            self.api_base == "https://api.openai.com/v1" and 
+            (model_lower.startswith("o") or "gpt-5" in model_lower)
+        )
+        
+        if uses_completion_tokens:
+            # For o-series and GPT-5 models that use response format API
             params = {
                 "model": self.model,
                 "messages": formatted_messages,
                 "max_completion_tokens": kwargs.get("max_tokens", self.max_tokens),
             }
+            # GPT-5 only supports temperature=1 (default)
+            if "gpt-5" in model_lower:
+                # GPT-5 requires temperature to be 1 (or omitted for default)
+                # Don't include temperature/top_p parameters for GPT-5
+                pass
+            elif model_lower.startswith("o"):
+                # o-series models don't support temperature/top_p with max_completion_tokens
+                pass
         else:
+            # For standard models
             params = {
                 "model": self.model,
                 "messages": formatted_messages,
